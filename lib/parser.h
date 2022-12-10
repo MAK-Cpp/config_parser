@@ -7,9 +7,6 @@
 #include <string>
 #include <cstring>
 #include <cmath>
-#include <tuple>
-#include <unordered_map>
-
 
 
 namespace omfl {
@@ -19,21 +16,20 @@ enum ArgumentType {Int, Float, String, Bool, Array, Space, None};
 class ConfigureArgument {
 public:
     
-    ConfigureArgument(const std::string& name = "", ArgumentType type = None, void* const value = nullptr, size_t size = 0) {
+    ConfigureArgument(const std::string& name = "", ArgumentType type = None, ConfigureArgument* parent = nullptr, void* const value = nullptr, size_t size = 0) {
             char* to_copy = static_cast<char*>(value);
             value_size_ = size;
             value_type_ = type;
             name_ = name;
             value_ = new char[size];
+            parent_ = parent;
             if (value_type_ == Array || value_type_ == Space) {
                 
-                for (size_t i = 0, id = 0; i < value_size_ / size_of_class_; i++, id += size_of_class_) {
+                for (size_t i = 0, id = 0; i < value_size_ / sizeof(ConfigureArgument); i++, id += sizeof(ConfigureArgument)) {
                     ConfigureArgument* copied_arg = reinterpret_cast<ConfigureArgument*>(to_copy + id);
                     ConfigureArgument* arg = new ConfigureArgument(*copied_arg);
-                    memcpy(value_ + id, arg, size_of_class_);
-                    arg = reinterpret_cast<ConfigureArgument*>(value_ + id);
-
-                    // std::cout << id << ' ' << arg->IsFloat() << '\n';
+                    arg->ChangeParent(this);
+                    memcpy(value_ + id, arg, sizeof(ConfigureArgument));
                 }
             } else {
                 memcpy(value_, to_copy, size);
@@ -44,13 +40,14 @@ public:
     ConfigureArgument(const ConfigureArgument& other)
         : name_(other.GetName())
         , value_type_(other.GetType())
-        , value_size_(other.GetSize()) {
+        , value_size_(other.GetSize())
+        , parent_(other.GetParent()) {
         value_ = new char[value_size_];
         if (value_type_ == Array || value_type_ == Space) {
-            for (size_t i = 0, id = 0; i < value_size_ / size_of_class_; i++, id += size_of_class_) {
+            for (size_t i = 0, id = 0; i < value_size_ / sizeof(ConfigureArgument); i++, id += sizeof(ConfigureArgument)) {
                 ConfigureArgument* arg = new ConfigureArgument(other[i]);
-                memcpy(value_ + id, arg, size_of_class_);
-                arg = reinterpret_cast<ConfigureArgument*>(value_ + id);
+                arg->ChangeParent(this);
+                memcpy(value_ + id, arg, sizeof(ConfigureArgument));
             }
         } else {
             memcpy(value_, other.GetValue(), value_size_);
@@ -58,21 +55,22 @@ public:
     }
     ~ConfigureArgument() {
         delete[] value_;
+        parent_ = nullptr;
     }
     ConfigureArgument& operator=(const ConfigureArgument& other) {
         
         name_ = other.GetName();
         value_type_ = other.GetType();
         value_size_ = other.GetSize();
+        parent_ = other.GetParent();
 
         delete[] value_;
         value_ = new char[value_size_];
         if (value_type_ == Array || value_type_ == Space) {
-            for (size_t i = 0, id = 0; i < value_size_ / size_of_class_; i++, id += size_of_class_) {
+            for (size_t i = 0, id = 0; i < value_size_ / sizeof(ConfigureArgument); i++, id += sizeof(ConfigureArgument)) {
                 ConfigureArgument* arg = new ConfigureArgument(other[i]);
-                memcpy(value_ + id, arg, size_of_class_);
-                arg = reinterpret_cast<ConfigureArgument*>(value_ + id);
-
+                arg->ChangeParent(this);
+                memcpy(value_ + id, arg, sizeof(ConfigureArgument));
             }
         } else {
             memcpy(value_, other.GetValue(), value_size_);
@@ -89,6 +87,13 @@ public:
     ArgumentType GetType() const {
         return value_type_;
     }
+    ConfigureArgument* GetParent() const {
+        return parent_;
+    }
+    void ChangeName(const std::string& new_name) {
+        name_ = new_name;
+    }
+    
     bool valid() const;
 
     
@@ -157,21 +162,22 @@ public:
         return value_type_ == Array;
     }
     ConfigureArgument& operator[](int id) const {
-        ConfigureArgument* ans = reinterpret_cast<ConfigureArgument*>(value_ + id * size_of_class_);
+        ConfigureArgument* ans = reinterpret_cast<ConfigureArgument*>(value_ + id * sizeof(ConfigureArgument));
         return *ans;
     }
     void PushBack(const ConfigureArgument& other) {
         ConfigureArgument* to_push = new ConfigureArgument(other);
-        char* resized_value_ = new char[value_size_ + size_of_class_];
+        char* resized_value_ = new char[value_size_ + sizeof(ConfigureArgument)];
+        to_push->ChangeParent(this);
         memcpy(resized_value_, value_, value_size_);
         delete[] value_;
-        memcpy(resized_value_ + value_size_, to_push, size_of_class_);
-        value_size_ += size_of_class_;
+        memcpy(resized_value_ + value_size_, to_push, sizeof(ConfigureArgument));
+        value_size_ += sizeof(ConfigureArgument);
         value_ = resized_value_;
     }
     size_t Length() const {
         if (IsArray() || IsSpace()) {
-            return value_size_ / size_of_class_;
+            return value_size_ / sizeof(ConfigureArgument);
         } else {
             return 0;
         }
@@ -183,16 +189,20 @@ public:
     }
     const ConfigureArgument& Get(const std::string& name) const;
 
+    
+
 private:
     std::string name_;
     char* value_;
     size_t value_size_;
     ArgumentType value_type_;
-    static const size_t size_of_class_ = sizeof(name_) + sizeof(value_) + sizeof(value_size_)  + sizeof(value_type_);
-    // static const size_t size_of_class_ = sizeof(ConfigureArgument); + sizeof(size_t)
+    ConfigureArgument* parent_;
 
     char* GetValue() const {
         return value_;
+    }
+    void ChangeParent(ConfigureArgument* parent) {
+        parent_ = parent;
     }
     
 };
