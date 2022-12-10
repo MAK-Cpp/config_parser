@@ -4,6 +4,7 @@
 #include <sstream>
 
 
+
 using namespace omfl;
 
 class ValidFormatTestSuite : public testing::TestWithParam<const char*> {

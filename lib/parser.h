@@ -16,9 +16,9 @@ namespace omfl {
 
 enum ArgumentType {Int, Float, String, Bool, Array, Space, None};
 
-#pragma pack(1)
 class ConfigureArgument {
 public:
+    
     ConfigureArgument(const std::string& name = "", ArgumentType type = None, void* const value = nullptr, size_t size = 0) {
             char* to_copy = static_cast<char*>(value);
             value_size_ = size;
@@ -27,10 +27,10 @@ public:
             value_ = new char[size];
             if (value_type_ == Array || value_type_ == Space) {
                 
-                for (size_t i = 0, id = 0; i < value_size_ / sizeof(ConfigureArgument); i++, id += sizeof(ConfigureArgument)) {
+                for (size_t i = 0, id = 0; i < value_size_ / size_of_class_; i++, id += size_of_class_) {
                     ConfigureArgument* copied_arg = reinterpret_cast<ConfigureArgument*>(to_copy + id);
                     ConfigureArgument* arg = new ConfigureArgument(*copied_arg);
-                    memcpy(value_ + id, arg, sizeof(ConfigureArgument));
+                    memcpy(value_ + id, arg, size_of_class_);
                     arg = reinterpret_cast<ConfigureArgument*>(value_ + id);
 
                     // std::cout << id << ' ' << arg->IsFloat() << '\n';
@@ -47,9 +47,9 @@ public:
         , value_size_(other.GetSize()) {
         value_ = new char[value_size_];
         if (value_type_ == Array || value_type_ == Space) {
-            for (size_t i = 0, id = 0; i < value_size_ / sizeof(ConfigureArgument); i++, id += sizeof(ConfigureArgument)) {
+            for (size_t i = 0, id = 0; i < value_size_ / size_of_class_; i++, id += size_of_class_) {
                 ConfigureArgument* arg = new ConfigureArgument(other[i]);
-                memcpy(value_ + id, arg, sizeof(ConfigureArgument));
+                memcpy(value_ + id, arg, size_of_class_);
                 arg = reinterpret_cast<ConfigureArgument*>(value_ + id);
             }
         } else {
@@ -68,9 +68,9 @@ public:
         delete[] value_;
         value_ = new char[value_size_];
         if (value_type_ == Array || value_type_ == Space) {
-            for (size_t i = 0, id = 0; i < value_size_ / sizeof(ConfigureArgument); i++, id += sizeof(ConfigureArgument)) {
+            for (size_t i = 0, id = 0; i < value_size_ / size_of_class_; i++, id += size_of_class_) {
                 ConfigureArgument* arg = new ConfigureArgument(other[i]);
-                memcpy(value_ + id, arg, sizeof(ConfigureArgument));
+                memcpy(value_ + id, arg, size_of_class_);
                 arg = reinterpret_cast<ConfigureArgument*>(value_ + id);
 
             }
@@ -157,21 +157,21 @@ public:
         return value_type_ == Array;
     }
     ConfigureArgument& operator[](int id) const {
-        ConfigureArgument* ans = reinterpret_cast<ConfigureArgument*>(value_ + id * sizeof(ConfigureArgument));
+        ConfigureArgument* ans = reinterpret_cast<ConfigureArgument*>(value_ + id * size_of_class_);
         return *ans;
     }
     void PushBack(const ConfigureArgument& other) {
         ConfigureArgument* to_push = new ConfigureArgument(other);
-        char* resized_value_ = new char[value_size_ + sizeof(ConfigureArgument)];
+        char* resized_value_ = new char[value_size_ + size_of_class_];
         memcpy(resized_value_, value_, value_size_);
         delete[] value_;
-        memcpy(resized_value_ + value_size_, to_push, sizeof(ConfigureArgument));
-        value_size_ += sizeof(ConfigureArgument);
+        memcpy(resized_value_ + value_size_, to_push, size_of_class_);
+        value_size_ += size_of_class_;
         value_ = resized_value_;
     }
     size_t Length() const {
         if (IsArray() || IsSpace()) {
-            return value_size_ / sizeof(ConfigureArgument);
+            return value_size_ / size_of_class_;
         } else {
             return 0;
         }
@@ -182,25 +182,25 @@ public:
         return value_type_ == Space;
     }
     const ConfigureArgument& Get(const std::string& name) const;
-    
-   
+
 private:
     std::string name_;
     char* value_;
     size_t value_size_;
     ArgumentType value_type_;
+    static const size_t size_of_class_ = sizeof(name_) + sizeof(value_) + sizeof(value_size_)  + sizeof(value_type_);
+    // static const size_t size_of_class_ = sizeof(ConfigureArgument); + sizeof(size_t)
 
     char* GetValue() const {
         return value_;
     }
     
 };
+// int x = sizeof(ConfigureArgument);
 
 std::ostream& operator << (std::ostream &os, const ConfigureArgument& p);
 std::istream& operator >> (std::istream& is, ConfigureArgument& p);
 
 ConfigureArgument& parse(const std::filesystem::path& path);
 ConfigureArgument& parse(const std::string& str);
-#pragma pop()
 }// namespace
-
