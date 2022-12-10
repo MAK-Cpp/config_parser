@@ -8,25 +8,26 @@
 #include <cstring>
 #include <cmath>
 #include <tuple>
+#include <unordered_map>
 
 
 
 namespace omfl {
 
-enum ArgumentType {Int, Float, String, Bool, Array, None};
+enum ArgumentType {Int, Float, String, Bool, Array, Space, None};
 
 #pragma pack(1)
 class ConfigureArgument {
 public:
-    ConfigureArgument(const std::string& name = "", void* const value = nullptr, ArgumentType type = None, size_t size = 0) {
+    ConfigureArgument(const std::string& name = "", ArgumentType type = None, void* const value = nullptr, size_t size = 0) {
             char* to_copy = static_cast<char*>(value);
             value_size_ = size;
             value_type_ = type;
             name_ = name;
             value_ = new char[size];
-            if (value_type_ == Array) {
+            if (value_type_ == Array || value_type_ == Space) {
                 
-                for (size_t i = 0, id = 0; i < size / sizeof(ConfigureArgument); i++, id += sizeof(ConfigureArgument)) {
+                for (size_t i = 0, id = 0; i < value_size_ / sizeof(ConfigureArgument); i++, id += sizeof(ConfigureArgument)) {
                     ConfigureArgument* copied_arg = reinterpret_cast<ConfigureArgument*>(to_copy + id);
                     ConfigureArgument* arg = new ConfigureArgument(*copied_arg);
                     memcpy(value_ + id, arg, sizeof(ConfigureArgument));
@@ -45,7 +46,7 @@ public:
         , value_type_(other.GetType())
         , value_size_(other.GetSize()) {
         value_ = new char[value_size_];
-        if (value_type_ == Array) {
+        if (value_type_ == Array || value_type_ == Space) {
             for (size_t i = 0, id = 0; i < value_size_ / sizeof(ConfigureArgument); i++, id += sizeof(ConfigureArgument)) {
                 ConfigureArgument* arg = new ConfigureArgument(other[i]);
                 memcpy(value_ + id, arg, sizeof(ConfigureArgument));
@@ -55,6 +56,9 @@ public:
             memcpy(value_, other.GetValue(), value_size_);
         }
     }
+    ~ConfigureArgument() {
+        delete[] value_;
+    }
     ConfigureArgument& operator=(const ConfigureArgument& other) {
         
         name_ = other.GetName();
@@ -63,7 +67,7 @@ public:
 
         delete[] value_;
         value_ = new char[value_size_];
-        if (value_type_ == Array) {
+        if (value_type_ == Array || value_type_ == Space) {
             for (size_t i = 0, id = 0; i < value_size_ / sizeof(ConfigureArgument); i++, id += sizeof(ConfigureArgument)) {
                 ConfigureArgument* arg = new ConfigureArgument(other[i]);
                 memcpy(value_ + id, arg, sizeof(ConfigureArgument));
@@ -85,6 +89,9 @@ public:
     ArgumentType GetType() const {
         return value_type_;
     }
+    bool valid() const;
+
+    
 
     // integer
     bool IsInt() const {
@@ -161,24 +168,22 @@ public:
         memcpy(resized_value_ + value_size_, to_push, sizeof(ConfigureArgument));
         value_size_ += sizeof(ConfigureArgument);
         value_ = resized_value_;
-        
     }
-    size_t SizeOfArray() const {
-        if (IsArray()) {
+    size_t Length() const {
+        if (IsArray() || IsSpace()) {
             return value_size_ / sizeof(ConfigureArgument);
         } else {
             return 0;
         }
     }
-    
-    ~ConfigureArgument() {
-        // std::cout << "Deleting " << name_ << " with adress " << this << "... ";
 
-        delete[] value_;
-        
-        
-        // std::cout << "Done!\n";
+    // Space
+    bool IsSpace() const {
+        return value_type_ == Space;
     }
+    const ConfigureArgument& Get(const std::string& name) const;
+    
+   
 private:
     std::string name_;
     char* value_;
@@ -191,28 +196,11 @@ private:
     
 };
 
-class ConfigureSpace {
-public:
-    ConfigureSpace(const std::string& name = ".EmptySpase."): argumets_(0) {
-        name_ = name;
-        nested_spaces_ = {};
-        // argumets_ = {};
-        // argumets_ = *new ConfigureMassive(".EmtpyMassive.");
-    }
-    ConfigureArgument& Get(const std::string&) const;
+std::ostream& operator << (std::ostream &os, const ConfigureArgument& p);
+std::istream& operator >> (std::istream& is, ConfigureArgument& p);
 
-    
-    bool valid() const;
-private:
-    std::string name_;
-    std::vector <ConfigureSpace> nested_spaces_;
-    std::vector <ConfigureArgument> argumets_;
-};
-
-std::ostream& operator << (std::ostream &os, const ConfigureArgument &p);
-
-ConfigureSpace parse(const std::filesystem::path& path);
-ConfigureSpace parse(const std::string& str);
+ConfigureArgument& parse(const std::filesystem::path& path);
+ConfigureArgument& parse(const std::string& str);
 #pragma pop()
 }// namespace
 

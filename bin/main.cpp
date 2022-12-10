@@ -9,27 +9,30 @@ void PrintByte(const char& byte) {
 }
 
 int main(int, char**) {
-    char v[] = "5 * 1e-10";
-    float Pi = 3.1415;
-    ConfigureArgument 
-    str("string argument", v, String, sizeof(v)), 
-    fl("float argument", &Pi, Float, sizeof(Pi));
-    ConfigureArgument copied = str;
-    ConfigureArgument int_mass("int array", nullptr, Array, 0);
-    for (int i = 0; i < 5; i++) {
-        int chis = (i + 200) * (i + 100) + i + 1234;
-        std::string name = "int argument №" + std::to_string(i + 1);
-        ConfigureArgument add(name, &chis, Int, sizeof(int));
-        int_mass.PushBack(add);
+    ConfigureArgument root(".Base.", Space);
+    int n, m;
+    std::cin >> n;
+    ConfigureArgument buff;
+    for (int i = 0; i < n; i++) {
+        std::cin >> buff;
+        // std::cout << buff << '\n';
+        root.PushBack(buff);
     }
-    ConfigureArgument mass[3] = {copied, int_mass, fl};
+    std::cout << root << '\n';
+    ConfigureArgument numbers("My lovely numbers", Space);
+    /*
+    добавить к классу переменную префикса, чтобы для пространств
+    выводить все имя, хотя это и не обязательно, но для приличия
 
+    ИЛИ
 
-    ConfigureArgument a("a", mass, Array, sizeof(mass));
-   
-    for (size_t i = 0; i < a.SizeOfArray(); i++) {
-        std::cout << a[i] << '\n';
-    }
+    добавить указатель на родительский класс
+
+    +
+
+    написать ф-цию, которая на вход получает строку, описывающую массив аргументов и возвращающая пару типа
+        Аргумент-Массив : индекс, где остановился
+    */
 
     return 0;
 }
