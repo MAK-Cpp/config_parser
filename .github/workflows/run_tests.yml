@@ -1,0 +1,15 @@
+name: C++ test CI on pushing
+
+on: push, pull_request_review
+
+jobs:
+  run-all-tests:
+    runs-on: ubuntu-latest
+    steps:
+      - name: CheckOut
+        uses: actions/checkout@v3
+
+      - run: cmake .
+      - run: cmake --build .
+      - run: ctest -V
+
