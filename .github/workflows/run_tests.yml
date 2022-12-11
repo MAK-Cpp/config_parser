@@ -1,6 +1,6 @@
 name: C++ test CI on pushing
 
-on: push, pull_request_review
+on: push
 
 jobs:
   run-all-tests:
