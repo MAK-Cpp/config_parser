@@ -7,6 +7,7 @@
 #include <string>
 #include <cstring>
 #include <cmath>
+#include <fstream>
 
 
 namespace omfl {
@@ -18,6 +19,7 @@ public:
     
     ConfigureArgument(const std::string& name = "", ArgumentType type = None, ConfigureArgument* parent = nullptr, void* const value = nullptr, size_t size = 0) {
             char* to_copy = static_cast<char*>(value);
+            valid_ = true;
             value_size_ = size;
             value_type_ = type;
             name_ = name;
@@ -41,7 +43,8 @@ public:
         : name_(other.GetName())
         , value_type_(other.GetType())
         , value_size_(other.GetSize())
-        , parent_(other.GetParent()) {
+        , parent_(other.GetParent())
+        , valid_(other.valid()) {
         value_ = new char[value_size_];
         if (value_type_ == Array || value_type_ == Space) {
             for (size_t i = 0, id = 0; i < value_size_ / sizeof(ConfigureArgument); i++, id += sizeof(ConfigureArgument)) {
@@ -63,6 +66,7 @@ public:
         value_type_ = other.GetType();
         value_size_ = other.GetSize();
         parent_ = other.GetParent();
+        valid_ = other.valid();
 
         delete[] value_;
         value_ = new char[value_size_];
@@ -93,7 +97,9 @@ public:
     void ChangeName(const std::string& new_name) {
         name_ = new_name;
     }
-    
+    void InValid() {
+        valid_ = false;
+    }
     bool valid() const;
 
     
@@ -162,7 +168,12 @@ public:
         return value_type_ == Array;
     }
     ConfigureArgument& operator[](int id) const {
-        ConfigureArgument* ans = reinterpret_cast<ConfigureArgument*>(value_ + id * sizeof(ConfigureArgument));
+        ConfigureArgument* ans;
+        if (id < 0 || id >= Length()) {
+            ans = new ConfigureArgument;
+        } else {
+            ans = reinterpret_cast<ConfigureArgument*>(value_ + id * sizeof(ConfigureArgument));
+        }
         return *ans;
     }
     void PushBack(const ConfigureArgument& other) {
@@ -188,6 +199,7 @@ public:
         return value_type_ == Space;
     }
     const ConfigureArgument& Get(const std::string& name) const;
+    ConfigureArgument& GetWithCreating(const std::string& name);
 
     
 
@@ -197,6 +209,7 @@ private:
     size_t value_size_;
     ArgumentType value_type_;
     ConfigureArgument* parent_;
+    bool valid_;
 
     char* GetValue() const {
         return value_;
