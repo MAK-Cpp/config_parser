@@ -421,6 +421,11 @@ ConfigureArgument& omfl::parse(const std::string& str) {
 }
 
 ConfigureArgument& omfl::parse(const std::filesystem::path& path) {
+    if (!(std::filesystem::is_regular_file(path) && path.extension() == ".omfl")) {
+        ConfigureArgument* invalid_arg = new ConfigureArgument;
+        invalid_arg->InValid();
+        return *invalid_arg;
+    }
     std::string to_parse = "";
     char x;
     std::ifstream file;
