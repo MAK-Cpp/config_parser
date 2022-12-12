@@ -31,7 +31,7 @@
 *.out
 *.app
 
-
+**/.idea
 **/_deps
 **/.cmake
 **/.vscode
