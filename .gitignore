@@ -31,6 +31,9 @@
 *.out
 *.app
 
+*.xls
+*.xml
+
 **/.idea
 **/_deps
 **/.cmake

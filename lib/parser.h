@@ -6,6 +6,7 @@
 #include <vector>
 #include <string>
 #include <cstring>
+#include <queue>
 #include <cmath>
 #include <fstream>
 
@@ -81,6 +82,8 @@ public:
         }
         return *this;
     }
+
+    void ExprotToXLS(const std::string& filename, const std::string& filepath);
 
     std::string GetName() const {
         return name_;

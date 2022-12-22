@@ -7,14 +7,14 @@ bool ConfigureArgument::valid() const {
     return valid_;
 }  
 
-std::string Parents(const ConfigureArgument* p) {
+std::string Parents(const ConfigureArgument* p, bool with_root = false) {
     
-    if (p == nullptr) {
-        return "";
-    } else if (p->GetParent() == nullptr) {
+    if (p->GetParent() == nullptr) {
+        return p->GetName();
+    } else if (p->GetParent()->GetName() == "__ROOT__" && !with_root) {
         return p->GetName();
     } 
-    return Parents(p->GetParent()) + '.' + p->GetName();
+    return Parents(p->GetParent(), with_root) + '.' + p->GetName();
 }
 
 ConfigureArgument* ArgumentParser(const std::string& arg, const std::string& name = "Array argument", int id = 0) {
@@ -132,9 +132,6 @@ std::pair <ConfigureArgument*, int> ArrayParser(const std::string& s, int i = 0)
                 ans.first->PushBack(*to_push);
             } 
             ans.second = i;
-            // if (ans.first->Length() == 0) {
-            //     ans.first->InValid();
-            // }
             return ans;
         } else {
             if (s[i] == ',') {
@@ -161,7 +158,7 @@ void PrintArray(std::ostream& os, const ConfigureArgument& Arr, int cnt_tabs = 0
     for (int i = 0; i < cnt_tabs; i++) {
         os << "\t";
     }
-    os << Arr.GetName() << ": [\n";
+    os << Arr.GetName() << "=[\n";
     for (size_t i = 0; i < Arr.Length(); i++) {
         if (Arr[i].GetType() == Array) {
             PrintArray(os, Arr[i], cnt_tabs + 1);
@@ -175,19 +172,26 @@ void PrintArray(std::ostream& os, const ConfigureArgument& Arr, int cnt_tabs = 0
     for (int i = 0; i < cnt_tabs; i++) {
         os << "\t";
     }
-    os << "]\n";
+    os << "]";
 }
 
 std::ostream& omfl::operator<<(std::ostream& os, const ConfigureArgument& p) {
     if (p.GetType() == Space) {
-        os << '[' << Parents(&p) << ']';
-        for (size_t i = 0; i < p.Length(); i++) {
-            os << '\n' << p[i] ;
+        if (p.GetName() == "__ROOT__") {
+            for (size_t i = 0; i < p.Length(); i++) {
+                os << p[i] << '\n' ;
+            }
+        } else {
+            os << '[' << Parents(&p) << ']';
+            for (size_t i = 0; i < p.Length(); i++) {
+                os << '\n' << p[i] ;
+            }
         }
+        
     } else if (p.GetType() == Array) {
         PrintArray(os, p);
     } else {
-        os << p.GetName() << ": ";
+        os << p.GetName() << '=';
         if (p.GetType() == Int) {
             os << p.AsInt();
         } else if (p.GetType() == Float) {
@@ -434,4 +438,110 @@ ConfigureArgument& omfl::parse(const std::filesystem::path& path) {
         to_parse += x;
     }
     return parse(to_parse);
+}
+
+std::string GetArrayInStr(const ConfigureArgument& array) {
+    std::string ans = "[";
+    for (int i = 0; i < array.Length(); i++) {
+        if (i != 0) ans += ", ";
+        if (array[i].GetType() == Array) {
+            ans += GetArrayInStr(array[i]);
+        } else {
+            switch(array[i].GetType()) {
+              case Int: {
+                ans += std::to_string(array[i].AsInt());
+                break;
+              }
+              case Float: {
+                ans += std::to_string(array[i].AsFloat());
+                break;
+              }
+              case String: {
+                ans += '"' + array[i].AsString() + '"';
+                break;
+              }
+              case Bool: {
+                ans += (array[i].AsBool() ? "true" : "false");
+                break;
+              }
+            }
+        }
+    }
+    ans += ']';
+    return ans;
+}
+
+void ConfigureArgument::ExprotToXLS(const std::string& filename, const std::string& filepath) {
+    std::ofstream table(filepath + '\\' + filename + ".xls", std::ios::binary);
+    const std::string pattern_begin = R"(<?xml version="1.0"?>
+<Workbook xmlns="urn:schemas-microsoft-com:office:spreadsheet"
+ xmlns:o="urn:schemas-microsoft-com:office:office"
+ xmlns:x="urn:schemas-microsoft-com:office:excel"
+ xmlns:ss="urn:schemas-microsoft-com:office:spreadsheet"
+ xmlns:html="http://www.w3.org/TR/REC-html40">
+ <Worksheet ss:Name="Sheet1">
+  <Table>
+)";
+  const std::string pattern_end = R"(  </Table>
+ </Worksheet>
+</Workbook>)";
+    table.write(pattern_begin.c_str(), pattern_begin.size());
+    std::queue <const ConfigureArgument*> to_print_data;
+    to_print_data.push(this);
+    int cnt_spaces = 1;
+    while (cnt_spaces != 0) {
+        const ConfigureArgument* space = to_print_data.front();
+        to_print_data.pop();
+        std::string new_space = R"(   <Row>
+    <Cell ss:MergeAcross="1"><Data ss:Type="String">)" + Parents(space, true) + R"(</Data></Cell>
+   </Row>
+)";
+        table.write(new_space.c_str(), new_space.size());
+        
+        for (int i = 0; i < space->Length(); i++) {
+            if ((*space)[i].GetType() == Space) {
+                to_print_data.push(&((*space)[i]));
+            } else {
+                table.write("   <Row>\n", 9);
+                std::string name = "    <Cell><Data ss:Type=\"String\">" + (*space)[i].GetName() + "</Data></Cell>\n";
+                table.write(name.c_str(), name.size());
+                switch ((*space)[i].GetType()) {
+                  case Int: {
+                    std::string value = "    <Cell><Data ss:Type=\"Number\">" + std::to_string((*space)[i].AsInt()) + "</Data></Cell>\n";
+                    table.write(value.c_str(), value.size());
+                    break;
+                  }
+                  case Float: {
+                    std::string value = "    <Cell><Data ss:Type=\"Number\">" + std::to_string((*space)[i].AsFloat()) + "</Data></Cell>\n";
+                    table.write(value.c_str(), value.size());
+                    break;
+                  }
+                  case String: {
+                    std::string value = "    <Cell><Data ss:Type=\"String\">" + (*space)[i].AsString() + "</Data></Cell>\n";
+                    table.write(value.c_str(), value.size());
+                    break;
+                  }
+                  case Bool: {
+                    std::string value;
+                    if ((*space)[i].AsBool()) {
+                        value = "    <Cell><Data ss:Type=\"String\">true</Data></Cell>\n";
+                    } else {
+                        value = "    <Cell><Data ss:Type=\"String\">false</Data></Cell>\n";
+                    }
+                    table.write(value.c_str(), value.size());
+                    break;
+                  }
+                  case Array: {
+                    std::string value = "    <Cell><Data ss:Type=\"String\">" + GetArrayInStr((*space)[i]) + "</Data></Cell>\n";
+                    table.write(value.c_str(), value.size());
+                    break;
+                  }
+                }
+                table.write("   </Row>\n", 10);
+            }
+        }
+        cnt_spaces = to_print_data.size();
+    }
+    table.write(pattern_end.c_str(), pattern_end.size());
+    table.close();
 }
